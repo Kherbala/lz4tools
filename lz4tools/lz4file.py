@@ -5,42 +5,32 @@ import lz4f
 import struct
 import sys
 
-if sys.version_info.major >= 3:
-    from builtins import open as _open
-else:
-    from __builtin__ import open as _open
-
-
 class Lz4File:
     def __init__(self, name, fileObj=None, seekable=True):
-        parseMagic = lambda x: binascii.hexlify(x[:4])
         self.name = name
-        if fileObj:
-            self.fileObj = fileObj
-            self.compEnd = self.tell_end()
+
+        if fileObj is None:
+            self.fileObj = open(name, 'rb')
         else:
-            return open(name)
-        self.header = fileObj.read(7)
-        if parseMagic(self.header) == b'04224d18':
+            self.fileObj = fileObj
+
+        self.compEnd = self.tell_end()
+        self.header = self.fileObj.read(7)
+
+        if binascii.hexlify(self.header[:4]) == b'04224d18':
             self.dCtx = lz4f.createDecompContext()
             self.fileInfo = lz4f.getFrameInfo(self.header, self.dCtx)
             self.blkSizeID = self.fileInfo.get('blkSize')
         else:
-            raise IOError
-        if seekable:
-            try:
-                self.load_blocks()
-            except:
-                print('Unable to load blockDict. Possibly not a lz4 file.')
-                raise IOError
+            raise IOError('Bad header or not supported header')
 
-    @classmethod
-    def open(cls, name=None, fileObj=None, seekable=True):
-        if not name and not fileObj:
-            sys.stderr.write('Nothing to open!')
-        if not fileObj:
-            fileObj = _open(name, 'rb')
-        return cls(name, fileObj, seekable)
+        if seekable:
+            self.load_blocks()
+            # try:
+                # self.load_blocks()
+
+            # except Exception as e:
+                # raise IOError('Unable to load blockDict')
 
     def close(self):
         self.fileObj.close()
@@ -51,11 +41,10 @@ class Lz4File:
         Generic decompress function. Will decompress the entire file to
         outName.
         """
-        writeOut = _open(outName, 'wb')
+        writeOut = open(outName, 'wb')
         for blk in self.blkDict.values():
             out = self.read_block(blk=blk)
             writeOut.write(out)
-            writeOut.flush()
         writeOut.close()
 
     def get_block_size(self):
@@ -64,11 +53,13 @@ class Lz4File:
         Static method to determine next block's blockSize.
         """
         size = struct.unpack('<I', self.fileObj.read(4))[0]
-        self.fileObj.seek(self.fileObj.tell()-4)
+        self.fileObj.seek(-4, 1)
         returnSize = (size & 0x7FFFFFFF)
+
         if not returnSize:
             return 0
-        return returnSize+4
+
+        return returnSize + 4
 
     def load_blocks(self):
         """
@@ -78,18 +69,29 @@ class Lz4File:
         self.blkDict = {}
         total, blkNum, pos = 0, 0, 7
         blkSize = self.get_block_size()
+
         while blkSize > 0:
             data = self.read_block(blkSize, setCur=False)
             total += len(data)
-            self.blkDict.update({blkNum: {'comp_begin': pos,
-                                'decomp_e': total, 'blkSize': blkSize}})
+            self.blkDict.update({
+                                    blkNum: {
+                                        'comp_begin': pos,
+                                        'decomp_e': total,
+                                        'blkSize': blkSize
+                                    }
+                                })
             blkNum += 1
-            if not self.fileObj.tell() == self.compEnd:
+
+            filePos = self.fileObj.tell()
+
+            if not filePos == self.compEnd:
                 blkSize = self.get_block_size()
             else:
                 break
-            pos = self.fileObj.tell()
-        self.end = total-1
+
+            pos = filePos
+
+        self.end = total - 1
         del data, total
         self.curBlk = 0
         self.decomp = self.read_block(blk=self.blkDict.get(0))
@@ -151,7 +153,9 @@ class Lz4File:
             blkSize += 8
             regen = True
         compData = self.fileObj.read(blkSize)
-        resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
+
+        #resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
+        resultDict = lz4f.decompressFrame(compData, self.dCtx)
         if 'regen' in locals():
             self._regenDCTX()
         return resultDict.get('decomp')
