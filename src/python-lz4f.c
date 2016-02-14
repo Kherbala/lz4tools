@@ -28,6 +28,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+ #ifdef _WIN32
+#define HAVE_ROUND
+#endif
 #include <Python.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -38,6 +41,13 @@
 #include "lz4frame.h"
 #include "python-lz4f.h"
 #include "structmember.h"
+
+#ifdef _WIN32
+#define __STR(x) #x
+#define STR(x) __STR(x)
+#else
+#define STR(x) x
+#endif
 
 #if PY_MAJOR_VERSION >= 3
    #define PyInt_FromSize_t(x) PyLong_FromSize_t(x)
@@ -441,9 +451,9 @@ void initlz4f(void)
         INITERROR;
     }
 
-    PyModule_AddStringConstant(module, "VERSION", VERSION);
-    PyModule_AddStringConstant(module, "__version__", VERSION);
-    PyModule_AddStringConstant(module, "LZ4_VERSION", LZ4_VERSION);
+    PyModule_AddStringConstant(module, "VERSION", STR(VERSION));
+    PyModule_AddStringConstant(module, "__version__", STR(VERSION));
+    PyModule_AddStringConstant(module, "LZ4_VERSION", STR(LZ4_VERSION));
 
 #if PY_MAJOR_VERSION >= 3
     return module;

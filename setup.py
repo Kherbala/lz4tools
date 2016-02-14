@@ -33,11 +33,12 @@ setup(
             'src/python-lz4f.c',
             'src/xxhash.c'
         ], extra_compile_args=[
-            "-std=c99",
-            "-O3",
-            "-Wall",
-            "-W",
-            "-Wundef",
+            #"-std=c99",
+            "/O2",
+            #"-O3",
+            #"-Wall",
+            #"-W",
+            #"-Wundef",
             "-DVERSION=\"%s\"" % VERSION_STR,
             "-DLZ4_VERSION=\"r124\"",
         ])],
