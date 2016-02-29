@@ -77,7 +77,8 @@ class Lz4File:
             # Finally try to load the next frame
             else:
                 #print "Load a new frame"
-                self.__loadFrame()
+                if not self.__loadFrame():
+                    break
 
         self.__pos += cpt
 
@@ -99,8 +100,7 @@ class Lz4File:
             self.__ctx = None
             self.__file = None
             self.__bClose = True
-
-        raise NotImplementedError();
+            self.__frames = None
 
     def __enter__(self):
         return self
@@ -167,7 +167,7 @@ class Lz4File:
 
             # No more frame ?
             if frame is None:
-                break
+                return False
 
             self.__frames.append(frame)
 
@@ -180,6 +180,8 @@ class Lz4File:
         res = lz4f.decompressFrame(raw, self.__ctx)
         if len(res['decomp']) != 0:
             raise IOError('Unexpected output')
+
+        return True
 
     def __loadBlock(self):
         frame = self.__frames[self.__iFrame]
